@@ -1,0 +1,88 @@
+name: Deploy CDK to AWS
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "CDK action to perform (deploy or destroy)"
+        required: true
+        default: "deploy"
+        type: choice
+        options:
+          - deploy
+          - destroy
+      deploy_env:
+        description: "Environment to deploy (dev, test, prod)"
+        required: true
+        default: "dev"
+        type: choice
+        options:
+          - dev
+          - test
+          - prod
+
+  push:
+    branches:
+      - main
+
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  cdk-deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cdk-app # <-- your CDK project root
+    env:
+      ACTION: ${{ github.event.inputs.action || 'deploy' }}
+      DEPLOY_ENV: ${{ github.event.inputs.deploy_env || 'dev' }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Install project dependencies
+        run: npm ci
+
+      - name: Install AWS CDK CLI globally
+        run: npm install -g aws-cdk
+
+      - name: CDK Bootstrap
+        run: cdk bootstrap aws://${{ secrets.AWS_ACCOUNT_ID }}/${{ secrets.AWS_REGION }}
+
+      - name: Show environment variables
+        run: |
+          echo "ACTION=$ACTION"
+          echo "DEPLOY_ENV=$DEPLOY_ENV"
+
+      - name: CDK Synth
+        run: npx cdk synth DevopsCdkStack
+
+      - name: CDK Deploy or Destroy
+        run: |
+          set -e  # stop on first error
+          if [ "$ACTION" = "deploy" ]; then
+            npx cdk deploy DevopsCdkStack --require-approval never
+          elif [ "$ACTION" = "destroy" ]; then
+            npx cdk destroy DevopsCdkStack --require-approval never
+          else
+            echo "Invalid action: $ACTION"
+            exit 1
+          fi
