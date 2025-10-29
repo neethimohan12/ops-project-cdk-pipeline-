@@ -10,7 +10,7 @@ export class OpsCdkStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    /** Context parameters */
+    // **Context Parameters**
     const vpcCidr = this.node.tryGetContext("vpcCidr") || "10.20.0.0/16";
     const instanceType = this.node.tryGetContext("instanceType") || "t2.micro";
     const desiredCapacity = this.node.tryGetContext("desiredCapacity") || 2;
@@ -18,12 +18,11 @@ export class OpsCdkStack extends cdk.Stack {
     const maxCapacity = this.node.tryGetContext("maxCapacity") || 4;
     const dbEngine = this.node.tryGetContext("dbEngine") || "postgres";
     const dbStorage = this.node.tryGetContext("dbStorage") || 20;
-    const dbInstanceType =
-      this.node.tryGetContext("dbInstanceType") || "t3.micro";
+    const dbInstanceType = this.node.tryGetContext("dbInstanceType") || "t3.micro";
 
     /** VPC */
     const vpc = new ec2.Vpc(this, "ProjectVPC", {
-      cidr: vpcCidr,
+      ipAddresses: ec2.IpAddresses.cidr(vpcCidr), // Replacing cidr with ipAddresses
       maxAzs: 2,
       natGateways: 1,
       subnetConfiguration: [
@@ -66,7 +65,7 @@ export class OpsCdkStack extends cdk.Stack {
     const launchTemplate = new ec2.LaunchTemplate(this, "WebLaunchTemplate", {
       instanceType: new ec2.InstanceType(instanceType),
       machineImage: ec2.MachineImage.latestAmazonLinux2023(),
-      securityGroup: ec2SG, 
+      securityGroup: ec2SG,
     });
 
     const asg = new autoscaling.AutoScalingGroup(this, "WebASG", {
